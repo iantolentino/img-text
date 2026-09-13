@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="description" content="A minimal, private, browser-based image to text converter." />
+    <title>Text Capture</title>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <style>
+      :root {
+        --background: #ffffff;
+        --foreground: #18181b;
+        --muted-foreground: #71717a;
+        --border: #e4e4e7;
+        --secondary: #f4f4f5;
+        --secondary-foreground: #18181b;
+        --ring: #18181b;
+        --destructive: #ef4444;
+        --destructive-foreground: #ffffff;
+        --success: #16a34a;
+        --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 3px rgb(0 0 0 / 0.05);
+        --radius: 0.75rem;
+        --radius-sm: 0.5rem;
+      }
+
+      *, *::before, *::after { box-sizing: border-box; }
+
+      html { min-width: 320px; background: var(--background); scroll-behavior: smooth; }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        color: var(--foreground);
+        background: linear-gradient(180deg, #fafafa 0, #f4f4f5 320px), #ffffff;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      button, textarea { font: inherit; }
+      button { cursor: pointer; }
+      button:disabled { cursor: not-allowed; opacity: 0.55; }
+
+      .app-shell { width: min(100%, 1120px); margin: 0 auto; padding: 48px 24px 64px; }
+
+      .site-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 40px; flex-wrap: wrap; }
+  .header-controls { display: flex; align-items: center; gap: 10px; }
+
+      .brand { display: flex; align-items: center; gap: 10px; min-width: 0; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+
+      .brand-mark {
+        display: grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center;
+        border: 1px solid var(--border); border-radius: 0.5rem; background: var(--background);
+        box-shadow: var(--shadow); font-size: 13px; font-weight: 700;
+      }
+
+      .privacy-label { display: flex; align-items: center; gap: 8px; color: var(--muted-foreground); font-size: 12px; white-space: nowrap; }
+
+      .privacy-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px rgb(22 163 74 / 0.08); }
+
+      .theme-toggle { background: var(--secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 12px; font-size: 13px; font-weight: 550; color: var(--foreground); display: inline-flex; align-items: center; gap: 6px; transition: background 150ms ease; }
+      .theme-toggle:hover { background: var(--border); }
+
+      body.dark-mode { color-scheme: dark; --background: #0c0c10; --foreground: #f2f2f7; --muted-foreground: #a1a1a6; --border: #1c1c22; --secondary: #16161a; --ring: #e4e4e7; --shadow: 0 1px 2px rgb(0 0 0 / 0.45); background: #0c0c10; }
+      body.dark-mode .upload-zone { background: var(--background); }
+      body.dark-mode .image-stage { background: #101012; }
+      body.dark-mode .upload-zone.drag-over { background: #121214; background-color: #121214 !important; }
+      body.dark-mode .result-text { color: var(--foreground); }
+      body.dark-mode .panel { background: #121214; border-color: #2a2a30; }
+      body.dark-mode .settings-body { background: #0f0f12; }
+      body.dark-mode .output-hint { background: #0f0f12; }
+      body.dark-mode h1 { color: #f2f2f7; }
+      body.dark-mode .intro p { color: #a1a1a6; }
+      body.dark-mode .eyebrow { color: #8e8e93; }
+      body.dark-mode .upload-content h2 { color: #f2f2f7; }
+      body.dark-mode .upload-content p { color: #8e8e93; }
+      body.dark-mode .image-name { color: #f2f2f7; }
+      body.dark-mode .image-preview { background: linear-gradient(45deg, #18181b 25%, transparent 25%), linear-gradient(-45deg, #18181b 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #18181b 75%), linear-gradient(-45deg, transparent 75%, #18181b 75%); background-position: 0 0, 0 10px, 10px -10px, -10px 0; background-size: 20px 20px; border-color: #2a2a30; }
+
+      .intro { max-width: 720px; margin: 0 0 32px; }
+
+      .eyebrow { margin: 0 0 8px; color: var(--muted-foreground); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+
+      h1 { margin: 0; font-size: clamp(30px, 5vw, 42px); font-weight: 650; letter-spacing: -0.035em; line-height: 1.15; }
+
+      .intro p { max-width: 640px; margin: 12px 0 0; color: var(--muted-foreground); font-size: 15px; }
+
+      .actions {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+      }
+
+      .panel { min-width: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--background); box-shadow: var(--shadow); }
+
+      .panel-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 64px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+
+      .panel-title { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; font-weight: 600; }
+
+      .panel-status { display: flex; align-items: center; gap: 7px; color: var(--muted-foreground); font-size: 12px; white-space: nowrap; }
+
+      .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #d4d4d8; }
+      .status-dot.active { background: #f59e0b; box-shadow: 0 0 0 3px rgb(245 158 11 / 0.12); animation: pulse 1.2s ease-in-out infinite; }
+      .status-dot.complete { background: var(--success); }
+      .status-dot.error { background: var(--destructive); }
+
+      @keyframes pulse { 50% { opacity: 0.45; transform: scale(0.8); } }
+
+      .upload-panel { overflow: hidden; height: 100%; display: flex; flex-direction: column; }
+      .upload-zone { flex: 1; }
+
+      .upload-zone {
+        display: grid; min-height: 460px; padding: 24px; place-items: center;
+        border-bottom: 1px solid var(--border); background: var(--background); text-align: center;
+        transition: border-color 160ms ease, background-color 160ms ease;
+      }
+      .upload-zone.drag-over, .upload-zone:focus-visible { border-color: var(--ring); background: #fafafa; outline: none; }
+
+      .upload-content { display: grid; width: min(100%, 430px); gap: 14px; justify-items: center; }
+
+      .upload-icon { display: grid; width: 48px; height: 48px; place-items: center; border: 1px solid var(--border); border-radius: 0.75rem; background: var(--secondary); color: var(--muted-foreground); box-shadow: var(--shadow); }
+      .upload-icon svg { width: 22px; height: 22px; }
+
+      .upload-content h2 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.015em; }
+      .upload-content p { margin: 0; color: var(--muted-foreground); font-size: 13px; }
+
+      .upload-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+
+      .button { display: inline-flex; min-height: 38px; align-items: center; justify-content: center; gap: 7px; padding: 0 14px; border: 1px solid transparent; border-radius: var(--radius-sm); background: var(--foreground); color: var(--background); font-size: 13px; font-weight: 550; line-height: 1; text-decoration: none; white-space: nowrap; transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease; }
+      .button:hover:not(:disabled) { background: #27272a; }
+      .button:active:not(:disabled) { transform: translateY(1px); }
+
+      .button.secondary { border-color: var(--border); background: var(--background); color: var(--foreground); }
+      .button.secondary:hover:not(:disabled) { border-color: #d4d4d8; background: var(--secondary); }
+
+      .button.ghost { border-color: transparent; background: transparent; color: var(--muted-foreground); }
+      .button.ghost:hover:not(:disabled) { background: var(--secondary); color: var(--foreground); }
+
+      .button.success { background: var(--success); }
+      .button.success:hover:not(:disabled) { background: #15803d; }
+
+      .button.danger { background: var(--destructive); }
+      .button.danger:hover:not(:disabled) { background: #dc2626; }
+
+      .button svg { width: 16px; height: 16px; }
+
+      .image-stage { display: none; min-height: 460px; padding: 24px; border-bottom: 1px solid var(--border); background: #fafafa; }
+
+      .image-stage.visible { display: grid; grid-template-columns: minmax(180px, 260px) minmax(0, 1fr); gap: 24px; align-items: center; }
+
+      .image-preview { position: relative; display: grid; min-height: 240px; overflow: hidden; place-items: center; border: 1px solid var(--border); border-radius: var(--radius-sm); background: linear-gradient(45deg, #ececec 25%, transparent 25%), linear-gradient(-45deg, #ececec 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ececec 75%), linear-gradient(-45deg, transparent 75%, #ececec 75%); background-position: 0 0, 0 10px, 10px -10px, -10px 0; background-size: 20px 20px; }
+
+      .image-preview img { display: block; width: 100%; max-height: 340px; object-fit: contain; }
+
+      .image-meta { display: grid; min-width: 0; gap: 16px; }
+      .image-name { overflow: hidden; font-size: 14px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+      .image-details { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted-foreground); font-size: 12px; }
+      .image-details span { display: inline-flex; align-items: center; gap: 6px; }
+      .image-details svg { width: 14px; height: 14px; }
+      .image-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+      .result-panel { overflow: hidden; height: 100%; display: flex; flex-direction: column; }
+
+      .result-body { display: grid; min-height: 482px; grid-template-rows: auto 1fr; background: var(--background); }
+
+      .result-placeholder { display: grid; min-height: 482px; padding: 28px; place-items: center; color: var(--muted-foreground); text-align: center; }
+
+      .placeholder-icon { display: grid; width: 44px; height: 44px; margin-bottom: 14px; place-items: center; border: 1px solid var(--border); border-radius: 0.75rem; background: var(--secondary); color: var(--muted-foreground); }
+      .placeholder-icon svg { width: 20px; height: 20px; }
+
+      .placeholder-copy { display: grid; gap: 6px; justify-items: center; }
+      .placeholder-copy strong { color: var(--foreground); font-size: 14px; font-weight: 600; }
+      .placeholder-copy span { max-width: 320px; font-size: 12px; }
+
+      .result-content { display: none; min-height: 482px; grid-template-rows: auto 1fr; }
+      .result-content.visible { display: grid; }
+
+      .result-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+
+      .result-meta { min-width: 0; }
+      .result-meta strong { display: block; overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+      .result-meta span { display: block; margin-top: 2px; color: var(--muted-foreground); font-size: 11px; }
+
+      .result-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+
+      .result-actions .button { min-height: 34px; padding: 0 10px; font-size: 12px; }
+
+      .result-text-wrap { display: grid; overflow: hidden; }
+      .result-text { display: block; width: 100%; height: 100%; min-height: 380px; padding: 14px; border: none; background: transparent; color: var(--foreground); resize: none; font: inherit; font-size: 14px; line-height: 1.65; }
+      .result-text:focus { outline: none; }
+      .result-text:empty::before { content: attr(data-placeholder); color: var(--muted-foreground); }
+
+      .settings-body { padding: 14px 18px; border-top: 1px solid var(--border); background: #fafafa; }
+
+      .settings-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+      .settings-label { color: var(--muted-foreground); font-size: 12px; }
+      .select-wrap { position: relative; }
+      .select-wrap select { appearance: none; background: var(--background); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 6px 28px 6px 10px; font-size: 13px; color: var(--foreground); box-shadow: var(--shadow); }
+      .select-wrap::after { content: ""; position: absolute; right: 10px; top: 50%; width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid var(--muted-foreground); pointer-events: none; transform: translateY(-50%); }
+
+      .output-hint { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-top: 1px solid var(--border); background: #fafafa; color: var(--muted-foreground); font-size: 12px; }
+
+      .empty-state { display: grid; gap: 10px; justify-items: center; text-align: center; }
+
+      .status-text { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted-foreground); }
+
+      .progress-track { width: 100%; height: 3px; border-radius: 99px; background: var(--secondary); }
+      .progress-fill { height: 100%; width: 0%; border-radius: 99px; background: var(--ring); transition: width 200ms ease; }
+
+      .toast { position: fixed; bottom: 24px; right: 24px; padding: 10px 14px; border-radius: var(--radius-sm); background: var(--foreground); color: var(--background); font-size: 13px; box-shadow: var(--shadow-lg); opacity: 0; transform: translateY(6px); transition: opacity 200ms ease, transform 200ms ease; pointer-events: none; }
+      .toast.visible { opacity: 1; transform: translateY(0); }
+
+      .workspace { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: stretch; }
+      @media (max-width: 900px) {
+        .workspace { grid-template-columns: 1fr; }
+        .upload-zone { min-height: 340px; }
+        .image-stage.visible { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="site-header">
+        <div class="brand">
+          <div class="brand-mark">T</div>
+          <span>Text Capture</span>
+        </div>
+        <div class="privacy-label"><div class="privacy-dot"></div><span>Private & local</span></div>
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle dark mode">Dark</button>
+      </header>
+      <section class="intro"><div class="eyebrow">Image to text</div><h1>Extract text from images instantly</h1><p>Upload an image or drag and drop it here. Text is extracted locally in your browser, no uploads needed.</p></section>
+
+      <!-- CENTERED ACTION BUTTONS -->
+      <div class="actions">
+        <button class="button" id="btnClear" type="button" disabled>Clear</button>
+        <button class="button success" id="btnConvert" type="button">Convert to text</button>
+      </div>
+
+      <main class="workspace">
+        <section class="panel upload-panel" id="uploadPanel" aria-label="Image upload">
+          <div class="panel-header"><div class="panel-title"><span>Upload Image</span></div><div class="panel-status" id="uploadStatus"><div class="status-dot" id="uploadDot"></div><span>Waiting</span></div></div>
+          <div class="upload-zone" id="uploadZone" tabindex="0" role="button" aria-label="Drop or paste image here">
+            <div class="upload-content">
+              <div class="upload-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15l-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></div>
+              <h2>Drop image here</h2><p>Or paste (Ctrl+V)</p>
+              <div class="upload-actions"><button class="button secondary" onclick="document.getElementById('fileInput').click()">Browse</button></div>
+            </div>
+          </div>
+          <div class="image-stage" id="imageStage" aria-label="Image preview">
+            <div class="image-preview" id="imagePreviewWrap"><img id="imagePreview" alt="Uploaded preview" /></div>
+            <div class="image-meta">
+              <div class="image-name" id="imageName">Untitled</div>
+              <div class="image-details"><span id="imageDim">0 x 0</span><span id="imageSize">0 KB</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel result-panel" aria-label="Extracted text">
+          <div class="panel-header"><div class="panel-title"><span>Result</span></div><div class="panel-status" id="resultStatus"><div class="status-dot" id="resultDot"></div><span id="resultStatusLabel">Waiting</span></div></div>
+          <div class="result-body" id="resultBody">
+            <div class="result-placeholder" id="resultPlaceholder"><div class="placeholder-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15l-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></div><div class="placeholder-copy"><strong>No image selected</strong><span>Upload an image above to start the extraction.</span></div></div>
+            <div class="result-content" id="resultContent" aria-label="Extracted text area">
+              <div class="result-toolbar"><div class="result-meta"><strong id="resultTitle">Text extract</strong><span id="resultSub">Words: 0 | Characters: 0</span></div><div class="result-actions"><button class="button secondary" id="btnCopy">Copy</button><button class="button ghost" id="btnDownload">Download</button></div></div>
+              <div class="result-text-wrap"><textarea class="result-text" id="resultText" data-placeholder="Extracted text will appear here..." readonly></textarea></div>
+            </div>
+          </div>
+          <div class="settings-body" id="settingsBody" style="display:none;"><div class="settings-row"><span class="settings-label">Language:</span><div class="select-wrap"><select id="langSelect"><option value="eng">English</option><option value="deu">German</option><option value="fra">French</option><option value="spa">Spanish</option><option value="ita">Italian</option><option value="por">Portuguese</option><option value="rus">Russian</option><option value="chi_sim">Chinese (Simplified)</option></select></div></div><div class="progress-track"><div class="progress-fill" id="progressFill"></div></div></div>
+          <div class="output-hint"><span>Text is processed locally in your browser.</span><span id="outputWords">0 words</span></div>
+        </section>
+      </main>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite">Copied to clipboard</div>
+    <input type="file" id="fileInput" accept="image/*" style="display:none;" />
+    <script>
+      const el = (id) => document.getElementById(id);
+      let currentFile = null;
+      function setDot(dot, s) { dot.className = 'status-dot ' + s; }
+      function showToast(msg) { const t = el('toast'); t.textContent = msg; t.classList.add('visible'); setTimeout(() => t.classList.remove('visible'), 2200); }
+      function formatBytes(b) { if (b === 0) return '0 KB'; const k = 1024; const i = Math.floor(Math.log(b) / Math.log(k)); const s = ['B', 'KB', 'MB', 'GB']; return parseFloat((b / Math.pow(k, i)).toFixed(1)) + ' ' + s[i]; }
+      function processFile(file) {
+        if (!file || !file.type.startsWith('image/')) return;
+        currentFile = file;
+        const url = URL.createObjectURL(file);
+        const img = el('imagePreview'); img.src = url;
+        el('imageName').textContent = file.name || 'Untitled';
+        el('imageDim').textContent = 'Reading...';
+        el('imageSize').textContent = formatBytes(file.size);
+        el('btnClear').disabled = false;
+        el('btnConvert').disabled = false;
+        el('imageStage').classList.add('visible');
+        el('uploadZone').style.display = 'none';
+        el('settingsBody').style.display = 'block';
+        setDot(el('uploadDot'), 'complete'); el('uploadStatus').querySelector('span').textContent = 'Ready';
+        setDot(el('resultDot'), 'complete'); el('resultStatusLabel').textContent = 'Waiting';
+        el('resultPlaceholder').style.display = 'none';
+        el('resultContent').classList.remove('visible');
+        el('resultText').value = '';
+        img.onload = () => { el('imageDim').textContent = img.naturalWidth + ' x ' + img.naturalHeight; URL.revokeObjectURL(url); };
+      }
+      // Events
+      el('uploadZone').addEventListener('dragover', (e) => { e.preventDefault(); el('uploadZone').classList.add('drag-over'); });
+      el('uploadZone').addEventListener('dragleave', () => el('uploadZone').classList.remove('drag-over'));
+      el('uploadZone').addEventListener('drop', (e) => { e.preventDefault(); el('uploadZone').classList.remove('drag-over'); const f = e.dataTransfer.files?.[0]; if (f) processFile(f); });
+      document.addEventListener('paste', (e) => { const item = e.clipboardData?.items?.[0]; if (item && item.type.startsWith('image/')) { e.preventDefault(); const f = item.getAsFile(); if (f) processFile(f); } });
+      el('btnClear').addEventListener('click', () => {
+        currentFile = null;
+        el('imageStage').classList.remove('visible');
+        el('uploadZone').style.display = '';
+        el('btnClear').disabled = true; el('btnConvert').disabled = true;
+        el('imagePreview').src = '';
+        el('imageName').textContent = 'Untitled'; el('imageDim').textContent = '0 x 0'; el('imageSize').textContent = '0 KB';
+        setDot(el('uploadDot'), ''); el('uploadStatus').querySelector('span').textContent = 'Waiting';
+        el('settingsBody').style.display = 'none';
+        el('resultPlaceholder').style.display = ''; el('resultContent').classList.remove('visible');
+        el('resultText').value = '';
+      });
+      el('btnConvert').addEventListener('click', async () => {
+        if (!currentFile) return;
+        el('btnConvert').disabled = true; el('btnConvert').textContent = 'Extracting...';
+        setDot(el('uploadDot'), 'active'); el('uploadStatus').querySelector('span').textContent = 'Reading';
+        setDot(el('resultDot'), 'active'); el('resultStatusLabel').textContent = 'Converting';
+        el('resultPlaceholder').style.display = 'none';
+        el('resultContent').classList.add('visible');
+        el('resultText').value = '';
+        el('progressFill').style.width = '0%';
+        try {
+          if (!window.Tesseract) throw new Error('OCR not loaded');
+          const lang = el('langSelect').value || 'eng';
+          const result = await Tesseract.recognize(currentFile, lang, {
+            logger: (m) => { if (m.status === 'recognizing text') el('progressFill').style.width = Math.round(m.progress * 100) + '%'; }
+          });
+          const text = result.data.text || '';
+          el('resultText').value = text;
+          const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+          const chars = text.length;
+          el('resultTitle').textContent = 'Text extract';
+          el('resultSub').textContent = 'Words: ' + words + ' | Characters: ' + chars;
+          el('outputWords').textContent = words + ' words';
+          setDot(el('resultDot'), 'complete'); el('resultStatusLabel').textContent = 'Done';
+          setDot(el('uploadDot'), 'complete'); el('uploadStatus').querySelector('span').textContent = 'Done';
+          el('progressFill').style.width = '100%';
+        } catch (e) {
+          el('resultText').value = 'Error: could not extract text. Make sure the image is clear and readable.';
+          setDot(el('resultDot'), 'error'); el('resultStatusLabel').textContent = 'Failed';
+          setDot(el('uploadDot'), 'error'); el('uploadStatus').querySelector('span').textContent = 'Failed';
+        } finally {
+          el('btnConvert').disabled = false; el('btnConvert').textContent = 'Convert to text';
+        }
+      });
+      el('btnCopy').addEventListener('click', () => { if (!el('resultText').value) return; navigator.clipboard.writeText(el('resultText').value).then(() => showToast('Copied to clipboard')); });
+      el('btnDownload').addEventListener('click', () => {
+        const text = el('resultText').value || '';
+        if (!text) return;
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = (currentFile?.name?.replace(/\.[^.]+$/, '') || 'extract') + '.txt'; a.click(); URL.revokeObjectURL(url);
+        showToast('Downloaded');
+      });
+
+      // Dark mode toggle
+      el('themeToggle').addEventListener('click', () => {
+        document.body.classList.toggle('dark-mode');
+        const isDark = document.body.classList.contains('dark-mode');
+        el('themeToggle').textContent = isDark ? 'Light' : 'Dark';
+        localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      });
+      // Restore saved theme
+      (function () {
+        const saved = localStorage.getItem('theme');
+        if (saved === 'dark') { document.body.classList.add('dark-mode'); el('themeToggle').textContent = 'Light'; }
+      })();
+    </script>
+  </body>
+</html>
