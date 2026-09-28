@@ -4,30 +4,32 @@ A minimal, private, browser-based image-to-text (OCR) converter built with HTML,
 
 ## Features
 
-- Drag-and-drop or paste (Ctrl+V) images directly
+- Drop anywhere on the page, paste (Ctrl+V), or browse — with a full-window drag overlay
 - Client-side OCR using Tesseract.js — no uploads, fully private
-- Extracted text with copy and download options
-- Shadcn-style minimal UI with light/dark mode
-- Multi-language OCR support (English, German, French, Spanish, Italian, Portuguese, Russian, Chinese Simplified)
-- Responsive 2-column layout: image upload left, result text right
-- Centered action buttons (Convert / Clear)
+- **Extract text** button lives with the image preview; result is editable before copying
+- Copy (with clipboard fallback) and download as `.txt`
+- Live progress with friendly stage labels (loading engine → reading image) and a spinner state
+- Language picker (8 languages) persisted between visits
+- Polished dark/light theme that follows the system by default, with manual toggle and persistence
+- Keyboard friendly: Tab to the drop zone, Enter/Space to browse, Ctrl+Enter to extract, Esc to clear
+- Responsive two-column workspace that stacks on smaller screens
 
 ## How to Use
 
-1. Open `index.html` in any modern browser.
-2. Upload, drag, or paste an image.
-3. Click **Convert to text**.
-4. View, copy, or download the extracted text.
-5. Click **Clear** to reset everything.
-6. Click the **Dark** button in the header to toggle dark mode.
+1. Open `index.html` (or the GitHub Pages URL) in any modern browser.
+2. Drop, paste, or browse for an image.
+3. Click **Extract text** (or press Ctrl+Enter).
+4. Edit the text if needed, then copy or download it.
+5. Click **Clear** (or press Esc) to reset everything.
+6. Toggle the theme with the sun/moon button in the header.
 
 ## Development
 
 No build tools required. Edit `index.html` directly.
 
 - `index.html` — complete single-file application
-- CSS variables in `:root` for theming
-- Dark mode uses `body.dark-mode` class
+- CSS variables on `:root` / `[data-theme="dark"]` for theming
+- Theme uses the `data-theme` attribute on `<html>` (system-aware, persisted)
 - JavaScript uses `Tesseract.recognize()` for OCR
 
 ### Contributing
